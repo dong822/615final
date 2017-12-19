@@ -1,0 +1,174 @@
+---
+title: "Untitled"
+author: "Shuai Dong"
+date: "12/14/2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(twitteR)
+library(devtools)
+library(stringr)
+library(wordcloud)
+library(tm)
+library(tidytext)
+library(tidyverse)
+library(SnowballC)   
+library(RColorBrewer)
+library(ggmap)
+```
+
+```{r}
+api_key<-"AC3DpZ5a3pnXCzEEPR4QsH9xq"
+api_secret<-"zSpEnHQtlRQO3UnBC6PjapBEqeKuGQiYZjTlNMyYhCil5MopRx"
+access_token<-"927639256457187335-2VBIwaf96VAnUyaOezrgxpfSXwaj8lN"
+access_token_secret<-"heiIjf6pwTC7ia7lRpzaRNvOVMM1SvmrN2yeWamMJ3eX6"
+setup_twitter_oauth(api_key,api_secret,access_token,access_token_secret)
+
+
+```
+
+```{r}
+###data search
+###I want to analyze how people think about starbucks in Los Angeles and New York.
+###First, starbucks in Los Angeles.
+tweets1 <- searchTwitter("starbucks", n=10000,lang="en",geocode="34.049933,-118.240843,80mi")
+tweetsdf1<-twListToDF(tweets1)
+df1<-data.frame(tweetsdf1$text)
+df1$id<-c(1:nrow(df1))
+write.csv(df1,"df1.csv")
+```
+
+```{r}
+###clean data and delete usefulness words.
+tweetsdf1$text<-str_replace_all(tweetsdf1$text, "�", "")
+myCorpus <- Corpus(VectorSource(str_replace_all(tweetsdf1$text, "@", "")))
+myCorpus <- tm_map(myCorpus, removePunctuation)
+myCorpus <- tm_map(myCorpus, content_transformer(tolower))
+myCorpus <- tm_map(myCorpus, removeWords, stopwords("english"))
+myCorpus <- tm_map(myCorpus, removeWords, c("starbucks","make"))
+myCorpus <- tm_map(myCorpus , removeNumbers)
+myCorpus <- tm_map(myCorpus , removeWords,c("just","get"))
+myCorpus <- tm_map(myCorpus, stripWhitespace)
+```
+
+
+```{r}
+###table/ggplot
+###make a plot to see the frequency of popular words.
+myCorpus<-tm_map(myCorpus, stemDocument)
+word.counts<-as.matrix(TermDocumentMatrix(myCorpus))
+word.freq<-sort(rowSums(word.counts), decreasing=TRUE)
+d<- data.frame(word= names(word.freq), freq=word.freq)
+d$word <- factor( d$word,levels = d$word [order(-d$freq)])
+d<-d[d$freq>2000,]
+p<-ggplot(d, aes(word, freq)) +
+ geom_area(aes(color = word),srt = 60) 
+p + theme(axis.text.x = element_text(angle = 60, hjust = 1))
+```
+
+```{r}
+###wordcloud1
+###make a word cloud for the frequent words.
+set.seed(123)
+wordcloud(words = myCorpus, scale=c(2,0.2), max.words=500, random.order=FALSE, 
+          rot.per=0.35, use.r.layout=FALSE, colors=brewer.pal(8,"Dark2"))
+```
+
+
+
+```{r}
+###save the latitude and longtitude of starbucks in Los Angeles.
+tweets1 <- searchTwitter("starbucks", n=10000,lang="en",geocode="34.049933,-118.240843,80mi")
+tweetsdf1<-twListToDF(tweets1)
+loc <- -1*is.na(tweetsdf1$longitude) + 1
+sum(loc)
+loc1  <- which(loc==1)
+locations <- data.frame(tweetsdf1$latitude[loc1], tweetsdf1$longitude[loc1])
+names(locations)<-c("lat","lon")
+locations$lat<-as.character(locations$lat)
+locations$lon<-as.character(locations$lon)
+locations$lat<-as.numeric(locations$lat)
+locations$lon<-as.numeric(locations$lon)
+write.csv(locations,"locations.csv")
+
+```
+
+
+
+
+```{r}
+###plot starbucks comments locations in Los Angeles
+lamap <- ggmap(get_map(location ="los angeles",scale =2, zoom = 8, source = "google", maptype = "roadmap")) + geom_point(aes(x=lon,y=lat),data=locations,alpha=.5,size = 1,color="red")
+lamap
+```
+
+
+```{r}
+###Now, we search starbucks comment in New York.
+tweets2 <- searchTwitter("starbucks", n=10000,lang="en",geocode="40.7128,-74.006,80mi")
+tweetsdf2<-twListToDF(tweets2)
+loc <- -1*is.na(tweetsdf2$longitude) + 1
+sum(loc)
+loc1  <- which(loc==1)
+locations1 <- data.frame(tweetsdf2$latitude[loc1], tweetsdf2$longitude[loc1])
+names(locations1)<-c("lat","lon")
+locations1$lat<-as.character(locations1$lat)
+locations1$lon<-as.character(locations1$lon)
+locations1$lat<-as.numeric(locations1$lat)
+locations1$lon<-as.numeric(locations1$lon)
+write.csv(locations1,"locations1.csv")
+df2<-data.frame(tweetsdf2$text)
+df2$id<-c(1:nrow(df2))
+write.csv(df2,"df2.csv")
+```
+
+```{r}
+###clean the data and get rid of some usefulness words.
+tweetsdf2$text<-str_replace_all(tweetsdf2$text, "�", "")
+myCorpus1 <- Corpus(VectorSource(str_replace_all(tweetsdf2$text, "@", "")))
+myCorpus1 <- tm_map(myCorpus1, removePunctuation)
+myCorpus1 <- tm_map(myCorpus1, content_transformer(tolower))
+myCorpus1 <- tm_map(myCorpus1, removeWords, stopwords("english"))
+myCorpus1 <- tm_map(myCorpus1, removeWords, c("starbucks","make","starbucksar"))
+myCorpus1 <- tm_map(myCorpus1 , removeNumbers)
+myCorpus1 <- tm_map(myCorpus1 , removeWords,c("just","get"))
+myCorpus1 <- tm_map(myCorpus1, stripWhitespace)
+```
+
+
+```{r}
+###table/ggplot
+###make a plot to see the frequency of popular words in New York.
+myCorpus1<-tm_map(myCorpus1, stemDocument)
+word.counts1<-as.matrix(TermDocumentMatrix(myCorpus1))
+word.freq1<-sort(rowSums(word.counts1), decreasing=TRUE)
+d1<- data.frame(word= names(word.freq1), freq=word.freq1)
+d1$word <- factor( d1$word,levels = d$word [order(-d1$freq)])
+d1<-d1[d1$freq>2000,]
+p1<-ggplot(d, aes(word, freq)) +
+ geom_area(aes(color = word),srt = 60) 
+p1 + theme(axis.text.x = element_text(angle = 60, hjust = 1))
+```
+```{r}
+###wordcloud1
+###make a word cloud for the frequent words for starbucks in New York.
+set.seed(123)
+wordcloud(words = myCorpus1, scale=c(2,0.2), max.words=500, random.order=FALSE, 
+          rot.per=0.35, use.r.layout=FALSE, colors=brewer.pal(8,"Dark2"))
+```
+
+
+
+```{r}
+###plot the comment locations in the New York map.
+nymap <- ggmap(get_map(location ="new york",scale =2, zoom = 8, source = "google", maptype = "roadmap")) + geom_point(aes(x=lon,y=lat),data=locations1,alpha=.5,size = 1,color="blue")
+nymap
+
+```
+
+
+
+
+
